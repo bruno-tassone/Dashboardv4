@@ -35,8 +35,6 @@ function normalizeSheets(parsed){
         const sem = weekCols[j-1];
         if(sem==null) continue;
         let val = row[j];
-        if(val===undefined || val===null) continue;
-        val = Number(val);
 
         if(val === undefined || val === null || val === "" || isNaN(Number(val))) {
           val = 0;
