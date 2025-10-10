@@ -38,6 +38,12 @@ function normalizeSheets(parsed){
         if(val===undefined || val===null) continue;
         val = Number(val);
 
+        if(val === undefined || val === null || val === "" || isNaN(Number(val))) {
+          val = 0;
+        } else {
+          val = Number(val);
+        }
+
         // ✅ Ajuste: multiplicar por 100 se for percentual
         if (['Índice de acerto', 'Acessos no período'].includes(sheetName)) {
           val = val * 100;
