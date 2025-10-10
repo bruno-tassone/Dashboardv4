@@ -149,6 +149,21 @@ export default function DashboardV8() {
     return sum / vals.length;
   }, [timeseries, selectedMetric]);
 
+// 🔹 Cálculo do ranking geral
+const [selectedRankingMetric, setSelectedRankingMetric] = useState('Índice de exercícios');
+
+const rankingData = useMemo(() => {
+  if (!dataBySchool) return [];
+  const rankingArr = Object.entries(dataBySchool).map(([school, rows]) => {
+    const vals = rows.map(r => Number(r[selectedRankingMetric] ?? 0));
+    const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+    return { school, avg };
+  });
+  rankingArr.sort((a, b) => b.avg - a.avg);
+  return rankingArr;
+}, [dataBySchool, selectedRankingMetric]);
+
+  
   const valorEhPercentual = selectedMetric === "Índice de acerto" || selectedMetric === "Acessos no período";
 
   // 🔹 Cálculo do indicador de tendência geral
@@ -215,6 +230,56 @@ export default function DashboardV8() {
     ))}
   </select>
 
+{/* 🔹 Painel de Ranking à Direita */}
+<div style={{
+  position: 'absolute',
+  right: 24,
+  top: 120,
+  width: 280,
+  background: '#f8fafc',
+  border: '1px solid #e2e8f0',
+  borderRadius: 12,
+  padding: 16,
+  boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+}}>
+  <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>🏫 Ranking de Escolas</div>
+  
+  <select
+    className="select"
+    value={selectedRankingMetric}
+    onChange={(e) => setSelectedRankingMetric(e.target.value)}
+    style={{ width: '100%', marginBottom: 8 }}
+  >
+    {metricNames.map(m => (
+      <option key={m} value={m}>{m}</option>
+    ))}
+  </select>
+
+  <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+    {rankingData.map((r, idx) => (
+      <div key={r.school} style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '6px 0',
+        borderBottom: '1px solid #e2e8f0',
+        fontSize: 14
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 600, width: 22, textAlign: 'right', color: idx < 3 ? '#2563eb' : '#475569' }}>
+            {idx + 1}.
+          </span>
+          <span>{r.school}</span>
+        </div>
+        <div style={{ fontWeight: 700, color: idx === 0 ? '#16a34a' : idx === rankingData.length - 1 ? '#dc2626' : '#475569' }}>
+          {r.avg.toFixed(1)}{selectedRankingMetric !== 'Índice de exercícios' ? '%' : ''}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+    
   <select className="select" value={selectedMetric} onChange={(e) => setSelectedMetric(e.target.value)}>
     {metricNames.map((m) => (
       <option key={m} value={m}>{m}</option>
