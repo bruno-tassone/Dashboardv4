@@ -91,9 +91,10 @@ export default function DashboardV4(){
     const f = e.target.files[0];
     if(!f) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      try{
-        const wb = XLSX.read(ev.target.result, {type:'binary'});
+   reader.onload = (ev) => {
+  try {
+    const data = new Uint8Array(ev.target.result);
+    const wb = XLSX.read(data, { type: 'array' });
         const parsed = parseWorkbookToJSON(wb);
         setRawSheets(parsed);
         localStorage.setItem('lovable_v4_data', JSON.stringify({ rawSheets: parsed }));
@@ -102,7 +103,7 @@ export default function DashboardV4(){
         console.error(err); setStatus('Erro ao ler arquivo');
       }
     };
-    reader.readAsBinaryString(f);
+    reader.readAsArrayBuffer(f);
   }
 
   const schools = useMemo(()=> dataBySchool ? Object.keys(dataBySchool).sort() : [], [dataBySchool]);
