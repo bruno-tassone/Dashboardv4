@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Head from "next/head";
 import * as XLSX from "xlsx";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis domain={[0, 100]}, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar
 } from "recharts";
 
