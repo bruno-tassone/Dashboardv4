@@ -1,10 +1,9 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import Head from "next/head";
 import * as XLSX from "xlsx";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell
+  BarChart, Bar
 } from "recharts";
 
 const COLORS = ['#2563eb','#10b981','#f97316'];
@@ -20,8 +19,6 @@ function parseWorkbookToJSON(workbook){
 }
 
 function normalizeSheets(parsed){
-  // parsed: sheetName -> rows (header row included)
-  // Expect header row: first col 'Escola', next columns 'Semana X'
   const out = {};
   for(const [sheetName, rows] of Object.entries(parsed)){
     if(!rows || rows.length<2) continue;
@@ -44,7 +41,6 @@ function normalizeSheets(parsed){
       }
     }
   }
-  // Convert to escola -> sorted array
   const final = {};
   for(const [esc, obj] of Object.entries(out)){
     const arr = Object.values(obj).sort((a,b)=>a.Semana-b.Semana);
@@ -53,17 +49,21 @@ function normalizeSheets(parsed){
   return final;
 }
 
-export default function DashboardV4(){
+export default function DashboardV5(){
   const [rawSheets, setRawSheets] = useState(null);
   const [dataBySchool, setDataBySchool] = useState(null);
   const [selectedSchool, setSelectedSchool] = useState(null);
-  const [selectedMetrics, setSelectedMetrics] = useState(['Índice de exercícios','Acessos no período','Índice de acerto']);
-  const [weekSelector, setWeekSelector] = useState(null); // numeric week
+  const [selectedMetric, setSelectedMetric] = useState('Índice de exercícios');
   const [status, setStatus] = useState('Nenhum arquivo carregado');
+
   const metricNames = ['Índice de exercícios','Acessos no período','Índice de acerto'];
+  const lineKeys = {
+    'Índice de exercícios': 'Exercicios',
+    'Acessos no período': 'Acessos',
+    'Índice de acerto': 'Acerto'
+  };
 
   useEffect(()=>{
-    // try load from localStorage if present
     try{
       const saved = localStorage.getItem('lovable_v4_data');
       if(saved){
@@ -80,21 +80,15 @@ export default function DashboardV4(){
     setDataBySchool(norm);
     const schools = Object.keys(norm).sort();
     if(schools.length) setSelectedSchool(schools[0]);
-    // set default week as last week available of first school
-    if(schools.length){
-      const first = norm[schools[0]];
-      if(first && first.length) setWeekSelector(first[first.length-1].Semana);
-    }
   },[rawSheets]);
 
   function handleFile(e){
     const f = e.target.files[0];
     if(!f) return;
     const reader = new FileReader();
-   reader.onload = (ev) => {
-  try {
-    const data = new Uint8Array(ev.target.result);
-    const wb = XLSX.read(data, { type: 'array' });
+    reader.onload = (ev) => {
+      try{
+        const wb = XLSX.read(ev.target.result, {type:'binary'});
         const parsed = parseWorkbookToJSON(wb);
         setRawSheets(parsed);
         localStorage.setItem('lovable_v4_data', JSON.stringify({ rawSheets: parsed }));
@@ -103,75 +97,41 @@ export default function DashboardV4(){
         console.error(err); setStatus('Erro ao ler arquivo');
       }
     };
-    reader.readAsArrayBuffer(f);
+    reader.readAsBinaryString(f);
   }
 
   const schools = useMemo(()=> dataBySchool ? Object.keys(dataBySchool).sort() : [], [dataBySchool]);
   const timeseries = useMemo(()=> (selectedSchool && dataBySchool) ? dataBySchool[selectedSchool] : [], [selectedSchool,dataBySchool]);
 
-  // Prepare data for charts
-  const chartData = timeseries.map(row => ({
+  const chartData = useMemo(()=> timeseries.map(row => ({
     Semana: row.Semana,
     Exercicios: row['Índice de exercícios'] ?? null,
     Acessos: row['Acessos no período'] ?? null,
     Acerto: row['Índice de acerto'] ?? null
-  }));
+  })), [timeseries]);
 
-  // Line data keys mapping for display
-  const lineKeys = {
-    'Índice de exercícios': 'Exercicios',
-    'Acessos no período': 'Acessos',
-    'Índice de acerto': 'Acerto'
-  };
+  // calcular média acumulada
+  const mediaAcumulada = useMemo(()=>{
+    if(!timeseries.length) return 0;
+    const key = selectedMetric;
+    const vals = timeseries.map(r=> Number(r[key] ?? 0));
+    const sum = vals.reduce((a,b)=>a+b,0);
+    return sum / vals.length;
+  },[timeseries,selectedMetric]);
 
-  function toggleMetric(metric){
-    if(selectedMetrics.includes(metric)){
-      setSelectedMetrics(selectedMetrics.filter(m=>m!==metric));
-    } else {
-      setSelectedMetrics([...selectedMetrics, metric]);
-    }
-  }
-
-  // Pie data for selected week (or aggregate if weekSelector null)
-  const pieData = useMemo(()=>{
-    if(!timeseries || timeseries.length===0) return [];
-    if(weekSelector!=null){
-      const row = timeseries.find(r=>r.Semana===Number(weekSelector));
-      if(!row) return [];
-      return [
-        {name:'Exercicios', value: row['Índice de exercícios'] ?? 0},
-        {name:'Acessos', value: row['Acessos no período'] ?? 0},
-        {name:'Acerto', value: row['Índice de acerto'] ?? 0},
-      ];
-    } else {
-      // aggregate over period (sum)
-      const agg = {Exercicios:0, Acessos:0, Acerto:0};
-      for(const r of timeseries){
-        agg.Exercicios += Number(r['Índice de exercícios'] ?? 0);
-        agg.Acessos += Number(r['Acessos no período'] ?? 0);
-        agg.Acerto += Number(r['Índice de acerto'] ?? 0);
-      }
-      return [
-        {name:'Exercicios', value: agg.Exercicios},
-        {name:'Acessos', value: agg.Acessos},
-        {name:'Acerto', value: agg.Acerto},
-      ];
-    }
-  },[timeseries,weekSelector]);
+  const valorEhPercentual = selectedMetric === 'Índice de acerto' || selectedMetric === 'Acessos no período';
 
   return (
     <div className="container">
-      <Head>
-        <title>Dashboard Programação V3</title>
-      </Head>
+      <Head><title>Dashboard Programação V5</title></Head>
 
       <div className="card">
         <div className="header">
           <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <div className="badge">V3</div>
+            <div className="badge">V5</div>
             <div>
-              <div className="title">Dashboard Programação V3</div>
-              <div style={{color:'#475569',fontSize:13}}>Visual colorido e didático — escolha escola e métricas</div>
+              <div className="title">Dashboard Programação V5</div>
+              <div style={{color:'#475569',fontSize:13}}>Escolha escola e métrica principal</div>
             </div>
           </div>
 
@@ -183,95 +143,64 @@ export default function DashboardV4(){
 
         <div className="grid">
           <div>
-            <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
               <select className="select" value={selectedSchool||''} onChange={e=>setSelectedSchool(e.target.value)}>
                 <option value="">-- selecione a escola --</option>
                 {schools.map(s=> <option key={s} value={s}>{s}</option>)}
               </select>
 
-              <select className="select" value={weekSelector||''} onChange={e=>setWeekSelector(Number(e.target.value)||null)}>
-                <option value="">Período: último</option>
-                {timeseries.map(r=> <option key={r.Semana} value={r.Semana}>Semana {r.Semana}</option>)}
+              <select className="select" value={selectedMetric} onChange={e=>setSelectedMetric(e.target.value)}>
+                {metricNames.map(m=> <option key={m} value={m}>{m}</option>)}
               </select>
-
-              <div style={{marginLeft:8, color:'#64748b'}}>Selecionar métricas:</div>
-              <div className="metrics">
-                {metricNames.map(m=> (
-                  <div key={m}
-                    onClick={()=>toggleMetric(m)}
-                    className={`metric-chip ${selectedMetrics.includes(m)?'active':''}`}
-                    style={{borderColor: selectedMetrics.includes(m)?'#c7d2fe':'transparent', background: selectedMetrics.includes(m)?'#eef2ff':'transparent'}}>
-                    {m}
-                  </div>
-                ))}
-              </div>
             </div>
 
-            <div style={{marginTop:12}} className="card">
-              <div style={{fontWeight:700, marginBottom:8}}>Gráfico principal — Linhas (comparativo)</div>
-              <div style={{width:'100%', height:360}}>
+            <div style={{marginTop:16}} className="card">
+              <div style={{fontWeight:700, marginBottom:8}}>
+                {selectedMetric} — Gráfico de Linhas
+              </div>
+              <div style={{width:'100%', height:380}}>
                 <ResponsiveContainer>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="Semana" />
-                    <YAxis />
-                    <Tooltip />
+                    <YAxis tickFormatter={valorEhPercentual ? (v=>`${v}%`) : undefined}/>
+                    <Tooltip formatter={(v)=> valorEhPercentual ? `${v}%` : v}/>
                     <Legend />
-                    {selectedMetrics.map((m,idx)=> (
-                      <Line key={m} type="monotone" dataKey={lineKeys[m]} stroke={COLORS[idx%COLORS.length]} strokeWidth={2} dot={{r:3}} />
-                    ))}
+                    <Line type="monotone"
+                          dataKey={lineKeys[selectedMetric]}
+                          stroke={COLORS[0]}
+                          strokeWidth={3}
+                          dot={{r:3}} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:12}}>
-              {/* Bar charts - one per selected metric, but only show single metric in bar form */}
-              {selectedMetrics.map((m, idx) => (
-                <div key={'bar-'+m} className="card">
-                  <div style={{fontWeight:700, marginBottom:8}}>{m} — Colunas</div>
-                  <div style={{width:'100%', height:220}}>
-                    <ResponsiveContainer>
-                      <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="Semana" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey={lineKeys[m]} fill={COLORS[idx%COLORS.length]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="side">
-            <div className="card">
-              <div style={{fontWeight:700, marginBottom:8}}>Distribuição — {weekSelector?('Semana '+weekSelector):'Período'}</div>
-              <div style={{width:'100%', height:240}}>
+            <div className="card" style={{marginTop:16}}>
+              <div style={{fontWeight:700, marginBottom:8}}>
+                {selectedMetric} — Gráfico de Colunas
+              </div>
+              <div style={{width:'100%', height:280}}>
                 <ResponsiveContainer>
-                  <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                      {pieData.map((entry, index) => <Cell key={`c-${index}`} fill={COLORS[index%COLORS.length]} />)}
-                    </Pie>
-                  </PieChart>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="Semana" />
+                    <YAxis tickFormatter={valorEhPercentual ? (v=>`${v}%`) : undefined}/>
+                    <Tooltip formatter={(v)=> valorEhPercentual ? `${v}%` : v}/>
+                    <Bar dataKey={lineKeys[selectedMetric]} fill={COLORS[1]} />
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
-                {pieData.map((p,i)=> <div key={'leg-'+i} style={{display:'flex',gap:8,alignItems:'center'}}><div style={{width:12,height:12,background:COLORS[i],borderRadius:3}}></div><div style={{fontSize:13}}>{p.name}: {Number(p.value).toFixed(2)}</div></div>)}
-              </div>
             </div>
 
-            <div className="card">
-              <div style={{fontWeight:700, marginBottom:8}}>Resumo</div>
-              <div style={{fontSize:13, color:'#475569'}}>
-                <div>Métricas selecionadas: {selectedMetrics.join(', ') || '—'}</div>
-                <div>Escola: {selectedSchool || '—'}</div>
-                <div>Semana: {weekSelector || 'última'}</div>
-                <div className="footer-note">Dica: para compartilhar os dados use o export do app (implementação opcional).</div>
+            <div className="card" style={{marginTop:16}}>
+              <div style={{fontWeight:700}}>Média acumulada</div>
+              <div style={{fontSize:22, fontWeight:600, color:'#2563eb', marginTop:4}}>
+                {valorEhPercentual ? `${mediaAcumulada.toFixed(1)}%` : mediaAcumulada.toFixed(2)}
               </div>
+              <div style={{fontSize:13, color:'#64748b'}}>Média das semanas para a métrica selecionada</div>
             </div>
+
           </div>
         </div>
 
