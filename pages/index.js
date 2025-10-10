@@ -195,12 +195,25 @@ export default function DashboardV6() {
                     <Tooltip formatter={(v) => (valorEhPercentual ? `${v}%` : v)} />
                     <Legend />
                     <Line
-                      type="monotone"
-                      dataKey={lineKeys[selectedMetric]}
-                      stroke={COLORS[0]}
-                      strokeWidth={3}
-                      dot={{ r: 3 }}
-                    />
+  type="monotone"
+  dataKey={lineKeys[selectedMetric]}
+  stroke={COLORS[0]}
+  strokeWidth={3}
+  dot={({ cx, cy, value }) => {
+    // Define meta conforme métrica
+    let meta = 0;
+    if (selectedMetric === "Índice de exercícios") meta = 2;
+    else if (selectedMetric === "Acessos no período") meta = 80;
+    else if (selectedMetric === "Índice de acerto") meta = 70;
+
+    // Define cor conforme valor
+    let fillColor = "#22c55e"; // verde
+    if (value < meta * 0.5) fillColor = "#ef4444"; // vermelho
+    else if (value < meta) fillColor = "#eab308"; // amarelo
+
+    return <circle cx={cx} cy={cy} r={5} fill={fillColor} stroke="white" strokeWidth={1.5} />;
+  }}
+/>
                     {/* 🔹 Linha de referência fixa por métrica */}
 {selectedMetric === "Índice de exercícios" && (
   <ReferenceLine y={2} stroke="#22c55e" strokeDasharray="4 2">
