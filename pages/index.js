@@ -2,9 +2,73 @@ import React, { useEffect, useMemo, useState } from "react";
 import Head from "next/head";
 import * as XLSX from "xlsx";
 import {
-  LineChart, Line, XAxis, YAxis domain={[0, 100]}, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar
 } from "recharts";
+
+{/* 🔹 Gráfico principal — Linhas */}
+<div style={{marginTop:12}} className="card">
+  <div style={{fontWeight:700, marginBottom:8}}>Gráfico principal — Linhas (comparativo)</div>
+  <div style={{width:'100%', height:360}}>
+    <ResponsiveContainer>
+      <LineChart data={chartData}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="Semana" />
+
+        {/* Eixo Y dinâmico: 0–100% para métricas percentuais */}
+        <YAxis
+          domain={
+            selectedMetrics.every(m => m === 'Índice de exercícios')
+              ? ['auto', 'auto']
+              : [0, 100]
+          }
+        />
+
+        <Tooltip />
+        <Legend />
+        {selectedMetrics.map((m, idx) => (
+          <Line
+            key={m}
+            type="monotone"
+            dataKey={lineKeys[m]}
+            stroke={COLORS[idx % COLORS.length]}
+            strokeWidth={2}
+            dot={{ r: 3 }}
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  </div>
+</div>
+
+{/* 🔹 Gráficos de Colunas */}
+<div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:12}}>
+  {selectedMetrics.map((m, idx) => (
+    <div key={'bar-' + m} className="card">
+      <div style={{fontWeight:700, marginBottom:8}}>{m} — Colunas</div>
+      <div style={{width:'100%', height:220}}>
+        <ResponsiveContainer>
+          <BarChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="Semana" />
+
+            {/* Eixo Y fixo até 100% apenas para métricas percentuais */}
+            <YAxis
+              domain={
+                m === 'Índice de exercícios'
+                  ? ['auto', 'auto']
+                  : [0, 100]
+              }
+            />
+
+            <Tooltip />
+            <Bar dataKey={lineKeys[m]} fill={COLORS[idx % COLORS.length]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  ))}
+</div>
 
 const COLORS = ['#2563eb','#10b981','#f97316'];
 
