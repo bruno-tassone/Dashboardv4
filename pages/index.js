@@ -201,13 +201,23 @@ export default function DashboardV6() {
                       strokeWidth={3}
                       dot={{ r: 3 }}
                     />
-                    <ReferenceLine
-                      y={mediaAcumulada}
-                      stroke="#ef4444"
-                      strokeDasharray="3 3"
-                    >
-                      <Label value="Média acumulada" position="right" fill="#ef4444" fontSize={12} />
-                    </ReferenceLine>
+                    {/* 🔹 Linha de referência fixa por métrica */}
+{selectedMetric === "Índice de exercícios" && (
+  <ReferenceLine y={2} stroke="#22c55e" strokeDasharray="4 2">
+    <Label value="Meta: 2" position="right" fill="#22c55e" fontSize={12} />
+  </ReferenceLine>
+)}
+{selectedMetric === "Acessos no período" && (
+  <ReferenceLine y={80} stroke="#22c55e" strokeDasharray="4 2">
+    <Label value="Meta: 80%" position="right" fill="#22c55e" fontSize={12} />
+  </ReferenceLine>
+)}
+{selectedMetric === "Índice de acerto" && (
+  <ReferenceLine y={70} stroke="#22c55e" strokeDasharray="4 2">
+    <Label value="Meta: 70%" position="right" fill="#22c55e" fontSize={12} />
+  </ReferenceLine>
+)}
+
                   </LineChart>
                 </ResponsiveContainer>
               </div>
