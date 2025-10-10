@@ -120,14 +120,16 @@ export default function DashboardV6() {
 
   const chartData = useMemo(
     () =>
-      timeseries.map((row) => ({
-        Semana: row.Semana,
-        Exercicios: row["Índice de exercícios"] ?? 0,
-        Acessos: row["Acessos no período"] ?? 0,
-        Acerto: row["Índice de acerto"] ?? 0,
-      })),
-    [timeseries]
-  );
+      const chartData = useMemo(() => {
+  return timeseries
+    .filter((row) => row.Semana !== 24 && row.Semana !== 25) // remove semanas 24 e 25
+    .map((row) => ({
+      Semana: row.Semana,
+      Exercicios: row["Índice de exercícios"] ?? 0,
+      Acessos: row["Acessos no período"] ?? 0,
+      Acerto: row["Índice de acerto"] ?? 0,
+    }));
+}, [timeseries]);
 
   const mediaAcumulada = useMemo(() => {
     if (!timeseries.length) return 0;
@@ -187,6 +189,13 @@ export default function DashboardV6() {
                 <ResponsiveContainer>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
+                  <ReferenceArea x1={23.5} x2={25.5} fill="#fde68a" fillOpacity={0.4} />
+<ReferenceLine
+  x={24}
+  stroke="#f59e0b"
+  strokeDasharray="3 3"
+  label={{ value: "Férias escolares", position: "top", fill: "#f59e0b" }}
+/>
                     <XAxis dataKey="Semana" />
                     <YAxis
                       domain={valorEhPercentual ? [0, 100] : ["auto", "auto"]}
