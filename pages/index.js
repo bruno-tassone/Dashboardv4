@@ -189,18 +189,22 @@ export default function DashboardV6() {
                 <ResponsiveContainer>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
-                  <ReferenceArea x1={23.5} x2={25.5} fill="#fde68a" fillOpacity={0.4} />
+
+{/* 🔸 Faixa de férias escolares */}
+<ReferenceArea x1={23.5} x2={25.5} fill="#fde68a" fillOpacity={0.4} />
 <ReferenceLine
   x={24}
   stroke="#f59e0b"
   strokeDasharray="3 3"
   label={{ value: "Férias escolares", position: "top", fill: "#f59e0b" }}
 />
-                    <XAxis dataKey="Semana" />
-                    <YAxis
-                      domain={valorEhPercentual ? [0, 100] : ["auto", "auto"]}
-                      tickFormatter={valorEhPercentual ? (v) => `${v}%` : undefined}
-                    />
+
+<XAxis dataKey="Semana" />
+<YAxis
+  domain={valorEhPercentual ? [0, 100] : ["auto", "auto"]}
+  tickFormatter={valorEhPercentual ? (v) => `${v}%` : undefined}
+/>
+                    
                     <Tooltip formatter={(v) => (valorEhPercentual ? `${v}%` : v)} />
                     <Legend />
                     <Line
