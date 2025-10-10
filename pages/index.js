@@ -34,13 +34,23 @@ function normalizeSheets(parsed){
       for(let j=1;j<row.length;j++){
         const sem = weekCols[j-1];
         if(sem==null) continue;
-        const val = row[j];
+        let val = row[j];
+        if(val===undefined || val===null) continue;
+        val = Number(val);
+
+        // ✅ Ajuste: multiplicar por 100 se for percentual
+        if (['Índice de acerto', 'Acessos no período'].includes(sheetName)) {
+          val = val * 100;
+        }
+
         out[escola] = out[escola] || {};
         out[escola][sem] = out[escola][sem] || { Escola: escola, Semana: sem };
-        out[escola][sem][sheetName] = (val===undefined || val===null) ? null : Number(val);
+        out[escola][sem][sheetName] = val;
       }
     }
   }
+
+  // Converter para formato final
   const final = {};
   for(const [esc, obj] of Object.entries(out)){
     const arr = Object.values(obj).sort((a,b)=>a.Semana-b.Semana);
@@ -48,6 +58,7 @@ function normalizeSheets(parsed){
   }
   return final;
 }
+
 
 export default function DashboardV5(){
   const [rawSheets, setRawSheets] = useState(null);
