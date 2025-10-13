@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+  ReferenceArea
 } from "recharts";
 
 export default function Dashboard() {
@@ -54,7 +61,9 @@ export default function Dashboard() {
   return (
     <div style={{ padding: "20px" }}>
       <h1>Dashboard</h1>
+      
       <input type="file" accept=".xlsx, .xls" onChange={handleUpload} />
+      
       <p>Arquivo padrão: <b>data_padrao.xlsx</b></p>
       {uploadedFile && <p>Arquivo enviado: <b>{uploadedFile.name}</b></p>}
 
@@ -75,7 +84,7 @@ export default function Dashboard() {
         {/* Observação férias */}
         <ReferenceArea x1={24} x2={25} strokeOpacity={0.3} label="Férias escolares" />
 
-        {/* Pontos coloridos */}
+        {/* Linha com pontos coloridos */}
         <Line
           type="monotone"
           dataKey="valor"
@@ -90,7 +99,3 @@ export default function Dashboard() {
   );
 }
 
-      </div>
-    </div>
-  );
-}
