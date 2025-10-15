@@ -230,30 +230,70 @@ export default function DashboardV8() {
                 </div>
               </div>
 
-              {/* 🔹 Tabela de dados */}
-              <div className="card" style={{ marginTop: 24 }}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>Tabela — Semana a Semana</div>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
-                      <th>Semana</th>
-                      <th>Índice de exercícios</th>
-                      <th>Acessos no período</th>
-                      <th>Índice de acerto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {chartData.map((r, i) => (
-                      <tr key={i} style={{ background: i % 2 ? "#ffffff" : "#f9fafb" }}>
-                        <td>{r.Semana}</td>
-                        <td style={{ color: getColor(r["Índice de exercícios"], 2, 1) }}>{r["Índice de exercícios"].toFixed(2)}</td>
-                        <td style={{ color: getColor(r["Acessos no período"], 75, 50) }}>{r["Acessos no período"].toFixed(1)}%</td>
-                        <td style={{ color: getColor(r["Índice de acerto"], 70, 50) }}>{r["Índice de acerto"].toFixed(1)}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+             {/* 🔹 Tabela de dados — formato novo */}
+<div className="card" style={{ marginTop: 24 }}>
+  <div style={{ fontWeight: 700, marginBottom: 8 }}>Tabela — Semana a Semana</div>
+
+  <div style={{ overflowX: "auto" }}>
+    <table style={{ borderCollapse: "collapse", minWidth: "700px" }}>
+      <thead>
+        <tr style={{ background: "#f1f5f9", textAlign: "center" }}>
+          <th style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>Indicador</th>
+          {chartData.map((r) => (
+            <th key={r.Semana} style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>
+              {r.Semana}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {[
+          { nome: "Índice de exercícios", meta: 2, atencao: 1 },
+          { nome: "Acessos no período", meta: 75, atencao: 50 },
+          { nome: "Índice de acerto", meta: 70, atencao: 50 },
+        ].map((indicador) => (
+          <tr key={indicador.nome} style={{ textAlign: "center" }}>
+            <td
+              style={{
+                padding: "8px 12px",
+                border: "1px solid #e2e8f0",
+                fontWeight: "600",
+                background: "#f8fafc",
+              }}
+            >
+              {indicador.nome}
+            </td>
+            {chartData.map((r, i) => {
+              const valor = r[indicador.nome] ?? 0;
+              const cor = getColor(valor, indicador.meta, indicador.atencao);
+              const exib = indicador.nome === "Índice de exercícios"
+                ? valor.toFixed(2)
+                : `${valor.toFixed(1)}%`;
+              return (
+                <td
+                  key={i}
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    background: cor,
+                    color: "black",
+                    padding: 6,
+                    fontWeight: 600,
+                    width: 45,
+                    height: 45,
+                    textAlign: "center",
+                    borderRadius: 6,
+                  }}
+                >
+                  {exib}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
 
               {/* 🔹 Ranking das escolas */}
               <div className="card" style={{ marginTop: 24 }}>
