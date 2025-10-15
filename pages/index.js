@@ -247,13 +247,31 @@ export default function DashboardV8() {
                         <circle cx={cx} cy={cy} r={5} fill={payload.Color} stroke="#fff" strokeWidth={2} />
                       )}
                     />
-                    <ReferenceLine
-                      y={mediaAcumulada}
-                      stroke={BASE_COLORS.red}
-                      strokeDasharray="3 3"
-                    >
-                      <Label value="Média acumulada" position="right" fill={BASE_COLORS.red} fontSize={12} />
-                    </ReferenceLine>
+                    {/* Linha de referência fixa conforme a métrica selecionada */}
+<ReferenceLine
+  y={
+    selectedMetric === "Índice de exercícios"
+      ? 2
+      : selectedMetric === "Índice de acerto"
+      ? 70
+      : 75
+  }
+  stroke={BASE_COLORS.red}
+  strokeWidth={2}
+>
+  <Label
+    value={
+      selectedMetric === "Índice de exercícios"
+        ? "Meta: 2"
+        : selectedMetric === "Índice de acerto"
+        ? "Meta: 70%"
+        : "Meta: 75%"
+    }
+    position="right"
+    fill={BASE_COLORS.green}
+    fontSize={12}
+  />
+</ReferenceLine>
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -279,13 +297,31 @@ export default function DashboardV8() {
                         <Cell key={`cell-${index}`} fill={entry.Color} />
                       ))}
                     </Bar>
-                    <ReferenceLine
-                      y={mediaAcumulada}
-                      stroke={BASE_COLORS.red}
-                      strokeDasharray="3 3"
-                    >
-                      <Label value="Média acumulada" position="right" fill={BASE_COLORS.red} fontSize={12} />
-                    </ReferenceLine>
+                    {/* Linha de referência fixa conforme a métrica selecionada */}
+<ReferenceLine
+  y={
+    selectedMetric === "Índice de exercícios"
+      ? 2
+      : selectedMetric === "Índice de acerto"
+      ? 70
+      : 75
+  }
+  stroke={BASE_COLORS.green}
+  strokeWidth={2}
+>
+  <Label
+    value={
+      selectedMetric === "Índice de exercícios"
+        ? "Meta: 2"
+        : selectedMetric === "Índice de acerto"
+        ? "Meta: 70%"
+        : "Meta: 75%"
+    }
+    position="right"
+    fill={BASE_COLORS.red}
+    fontSize={12}
+  />
+</ReferenceLine>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
