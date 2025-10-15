@@ -8,7 +8,8 @@ import {
 
 const BASE_COLORS = {
   blue: "#2563eb",
-  green: "#10b981",
+  green: "#16a34a",
+  yellow: "#facc15",
   orange: "#f97316",
   red: "#ef4444",
   gray: "#94a3b8"
@@ -41,26 +42,20 @@ function normalizeSheets(parsed) {
         const sem = weekCols[j - 1];
         if (sem == null) continue;
         let val = row[j];
-
-        // Células em branco → 0
         if (val === undefined || val === null || val === "" || isNaN(Number(val))) {
           val = 0;
         } else {
           val = Number(val);
         }
-
-        // Corrigir porcentagens (0.45 → 45)
         if (["Índice de acerto", "Acessos no período"].includes(sheetName) && val <= 1) {
           val = val * 100;
         }
-
         out[escola] = out[escola] || {};
         out[escola][sem] = out[escola][sem] || { Escola: escola, Semana: sem };
         out[escola][sem][sheetName] = val;
       }
     }
   }
-
   const final = {};
   for (const [esc, obj] of Object.entries(out)) {
     const arr = Object.values(obj).sort((a, b) => a.Semana - b.Semana);
@@ -125,44 +120,55 @@ export default function DashboardV8() {
   const timeseries = useMemo(() => (selectedSchool && dataBySchool ? dataBySchool[selectedSchool] : []), [selectedSchool, dataBySchool]);
 
   const chartData = useMemo(() => {
-    const arr = timeseries.map((row, i) => {
-      const prev = i > 0 ? timeseries[i - 1] : null;
-      const diff = prev ? row[selectedMetric] - prev[selectedMetric] : 0;
-      let cor = BASE_COLORS.gray;
-      if (diff > 0.01) cor = BASE_COLORS.green;
-      else if (diff < -0.01) cor = BASE_COLORS.red;
+    const metaY =
+      selectedMetric === "Índice de exercícios"
+        ? 2
+        : selectedMetric === "Índice de acerto"
+        ? 70
+        : 75;
+    const atencaoY =
+      selectedMetric === "Índice de exercícios"
+        ? 1
+        : selectedMetric === "Índice de acerto"
+        ? 50
+        : 50;
+
+    return timeseries.map((row) => {
+      const valor =
+        selectedMetric === "Índice de exercícios"
+          ? row["Índice de exercícios"] ?? 0
+          : selectedMetric === "Acessos no período"
+          ? row["Acessos no período"] ?? 0
+          : row["Índice de acerto"] ?? 0;
+
+      let cor = BASE_COLORS.red;
+      if (valor >= metaY) cor = BASE_COLORS.green;
+      else if (valor >= atencaoY) cor = BASE_COLORS.yellow;
+
       return {
         Semana: row.Semana,
         Exercicios: row["Índice de exercícios"] ?? 0,
         Acessos: row["Acessos no período"] ?? 0,
         Acerto: row["Índice de acerto"] ?? 0,
-        Color: cor
+        Color: cor,
       };
     });
-    return arr;
-  }, [timeseries, selectedMetric]);
-
-  const mediaAcumulada = useMemo(() => {
-    if (!timeseries.length) return 0;
-    const vals = timeseries.map((r) => Number(r[selectedMetric] ?? 0));
-    const sum = vals.reduce((a, b) => a + b, 0);
-    return sum / vals.length;
   }, [timeseries, selectedMetric]);
 
   const valorEhPercentual = selectedMetric === "Índice de acerto" || selectedMetric === "Acessos no período";
 
-  // 🔹 Cálculo do indicador de tendência geral
-  const tendencia = useMemo(() => {
-    if (!timeseries.length) return { texto: "Sem dados", cor: BASE_COLORS.gray, emoji: "⚪" };
-    const ultimo = timeseries[timeseries.length - 1][selectedMetric];
-    const diff = ultimo - mediaAcumulada;
-    const diffPct = (diff / mediaAcumulada) * 100;
-    if (diffPct > 2)
-      return { texto: `Em alta (+${diffPct.toFixed(1)}%)`, cor: BASE_COLORS.green, emoji: "🔺" };
-    if (diffPct < -2)
-      return { texto: `Em queda (${diffPct.toFixed(1)}%)`, cor: BASE_COLORS.red, emoji: "🔻" };
-    return { texto: "Estável (na média)", cor: BASE_COLORS.gray, emoji: "⚪" };
-  }, [timeseries, mediaAcumulada, selectedMetric]);
+  const metaY =
+    selectedMetric === "Índice de exercícios"
+      ? 2
+      : selectedMetric === "Índice de acerto"
+      ? 70
+      : 75;
+  const atencaoY =
+    selectedMetric === "Índice de exercícios"
+      ? 1
+      : selectedMetric === "Índice de acerto"
+      ? 50
+      : 50;
 
   return (
     <div className="container">
@@ -175,7 +181,7 @@ export default function DashboardV8() {
             <div>
               <div className="title">Dashboard Programação V8</div>
               <div style={{ color: "#475569", fontSize: 13 }}>
-                Cores dinâmicas, média acumulada e indicador de tendência
+                Linhas de referência fixas e cores dinâmicas nos pontos
               </div>
             </div>
           </div>
@@ -188,33 +194,15 @@ export default function DashboardV8() {
           </div>
         </div>
 
-        {/* 🔹 Indicador de tendência geral */}
         {timeseries.length > 0 && (
-          <div className="card" style={{ marginTop: 12, border: `2px solid ${tendencia.cor}` }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 28 }}>{tendencia.emoji}</span>
-              <div>
-                <div style={{ fontWeight: 700, color: tendencia.cor }}>
-                  {tendencia.texto}
-                </div>
-                <div style={{ fontSize: 13, color: "#64748b" }}>
-                  Comparando a última semana com a média acumulada
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="grid">
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+          <div style={{ marginTop: 20 }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <select className="select" value={selectedSchool || ""} onChange={(e) => setSelectedSchool(e.target.value)}>
                 <option value="">-- selecione a escola --</option>
                 {schools.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
-
               <select className="select" value={selectedMetric} onChange={(e) => setSelectedMetric(e.target.value)}>
                 {metricNames.map((m) => (
                   <option key={m} value={m}>{m}</option>
@@ -222,12 +210,11 @@ export default function DashboardV8() {
               </select>
             </div>
 
-            {/* 🔹 Gráfico de Linhas */}
             <div style={{ marginTop: 16 }} className="card">
               <div style={{ fontWeight: 700, marginBottom: 8 }}>
                 {selectedMetric} — Tendência
               </div>
-              <div style={{ width: "100%", height: 380 }}>
+              <div style={{ width: "100%", height: 400 }}>
                 <ResponsiveContainer>
                   <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -238,164 +225,33 @@ export default function DashboardV8() {
                     />
                     <Tooltip formatter={(v) => (valorEhPercentual ? `${v.toFixed(1)}%` : v.toFixed(2))} />
                     <Legend />
+
+                    {/* Linha de meta */}
+                    <ReferenceLine y={metaY} stroke={BASE_COLORS.green} strokeDasharray="5 5">
+                      <Label value="Meta" position="right" fill={BASE_COLORS.green} fontSize={12} />
+                    </ReferenceLine>
+
+                    {/* Linha de atenção */}
+                    <ReferenceLine y={atencaoY} stroke={BASE_COLORS.yellow} strokeDasharray="5 5">
+                      <Label value="Atenção" position="right" fill={BASE_COLORS.yellow} fontSize={12} />
+                    </ReferenceLine>
+
                     <Line
                       type="monotone"
                       dataKey={lineKeys[selectedMetric]}
                       stroke={BASE_COLORS.blue}
                       strokeWidth={3}
                       dot={({ cx, cy, payload }) => (
-                        <circle cx={cx} cy={cy} r={5} fill={payload.Color} stroke="#fff" strokeWidth={2} />
+                        <circle cx={cx} cy={cy} r={6} fill={payload.Color} stroke="#fff" strokeWidth={2} />
                       )}
                     />
-                    {/* Linha de referência fixa conforme a métrica selecionada */}
-{/* 🔹 Linha verde pontilhada — meta */}
-<ReferenceLine
-  y={
-    selectedMetric === "Índice de exercícios"
-      ? 2
-      : selectedMetric === "Índice de acerto"
-      ? 70
-      : 75
-  }
-  stroke={BASE_COLORS.green}
-  strokeDasharray="4 4"
-  strokeWidth={2}
->
-  <Label
-    value={
-      selectedMetric === "Índice de exercícios"
-        ? "Meta: 2"
-        : selectedMetric === "Índice de acerto"
-        ? "Meta: 70%"
-        : "Meta: 75%"
-    }
-    position="right"
-    fill={BASE_COLORS.green}
-    fontSize={12}
-  />
-</ReferenceLine>
-
-{/* 🔹 Linha amarela pontilhada — atenção */}
-<ReferenceLine
-  y={
-    selectedMetric === "Índice de exercícios"
-      ? 1
-      : selectedMetric === "Índice de acerto"
-      ? 50
-      : 50
-  }
-  stroke={BASE_COLORS.orange}
-  strokeDasharray="4 4"
-  strokeWidth={2}
->
-  <Label
-    value={
-      selectedMetric === "Índice de exercícios"
-        ? "Atenção: 1"
-        : "Atenção: 50%"
-    }
-    position="right"
-    fill={BASE_COLORS.orange}
-    fontSize={12}
-  />
-</ReferenceLine>
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
-
-            {/* 🔹 Gráfico de Colunas */}
-            <div className="card" style={{ marginTop: 16 }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                {selectedMetric} — Comparativo semanal
-              </div>
-              <div style={{ width: "100%", height: 280 }}>
-                <ResponsiveContainer>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="Semana" />
-                    <YAxis
-                      domain={valorEhPercentual ? [0, 100] : ["auto", "auto"]}
-                      tickFormatter={valorEhPercentual ? (v) => `${v}%` : undefined}
-                    />
-                    <Tooltip formatter={(v) => (valorEhPercentual ? `${v.toFixed(1)}%` : v.toFixed(2))} />
-                    <Bar dataKey={lineKeys[selectedMetric]}>
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.Color} />
-                      ))}
-                    </Bar>
-                    {/* Linha de referência fixa conforme a métrica selecionada */}
-{/* 🔹 Linha verde pontilhada — meta */}
-<ReferenceLine
-  y={
-    selectedMetric === "Índice de exercícios"
-      ? 2
-      : selectedMetric === "Índice de acerto"
-      ? 70
-      : 75
-  }
-  stroke={BASE_COLORS.green}
-  strokeDasharray="4 4"
-  strokeWidth={2}
->
-  <Label
-    value={
-      selectedMetric === "Índice de exercícios"
-        ? "Meta: 2"
-        : selectedMetric === "Índice de acerto"
-        ? "Meta: 70%"
-        : "Meta: 75%"
-    }
-    position="right"
-    fill={BASE_COLORS.green}
-    fontSize={12}
-  />
-</ReferenceLine>
-
-{/* 🔹 Linha amarela pontilhada — atenção */}
-<ReferenceLine
-  y={
-    selectedMetric === "Índice de exercícios"
-      ? 1
-      : selectedMetric === "Índice de acerto"
-      ? 50
-      : 50
-  }
-  stroke={BASE_COLORS.orange}
-  strokeDasharray="4 4"
-  strokeWidth={2}
->
-  <Label
-    value={
-      selectedMetric === "Índice de exercícios"
-        ? "Atenção: 1"
-        : "Atenção: 50%"
-    }
-    position="right"
-    fill={BASE_COLORS.orange}
-    fontSize={12}
-  />
-</ReferenceLine>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* 🔹 Valor numérico da média */}
-            <div className="card" style={{ marginTop: 16 }}>
-              <div style={{ fontWeight: 700 }}>Média acumulada</div>
-              <div style={{ fontSize: 22, fontWeight: 600, color: BASE_COLORS.blue, marginTop: 4 }}>
-                {valorEhPercentual ? `${mediaAcumulada.toFixed(1)}%` : mediaAcumulada.toFixed(2)}
-              </div>
-              <div style={{ fontSize: 13, color: "#64748b" }}>
-                Média das semanas para a métrica selecionada
-              </div>
-            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 }
-
-
