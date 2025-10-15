@@ -356,7 +356,7 @@ export default function DashboardV8() {
       );
     })()}
   </div>
-)}
+)};
 
   function getColor(valor, meta, atencao) {
     if (valor >= meta) return BASE_COLORS.green;
