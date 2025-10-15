@@ -248,6 +248,7 @@ export default function DashboardV8() {
                       )}
                     />
                     {/* Linha de referência fixa conforme a métrica selecionada */}
+{/* 🔹 Linha verde pontilhada — meta */}
 <ReferenceLine
   y={
     selectedMetric === "Índice de exercícios"
@@ -256,7 +257,8 @@ export default function DashboardV8() {
       ? 70
       : 75
   }
-  stroke={BASE_COLORS.red}
+  stroke={BASE_COLORS.green}
+  strokeDasharray="4 4"
   strokeWidth={2}
 >
   <Label
@@ -269,6 +271,31 @@ export default function DashboardV8() {
     }
     position="right"
     fill={BASE_COLORS.green}
+    fontSize={12}
+  />
+</ReferenceLine>
+
+{/* 🔹 Linha amarela pontilhada — atenção */}
+<ReferenceLine
+  y={
+    selectedMetric === "Índice de exercícios"
+      ? 1
+      : selectedMetric === "Índice de acerto"
+      ? 50
+      : 50
+  }
+  stroke={BASE_COLORS.orange}
+  strokeDasharray="4 4"
+  strokeWidth={2}
+>
+  <Label
+    value={
+      selectedMetric === "Índice de exercícios"
+        ? "Atenção: 1"
+        : "Atenção: 50%"
+    }
+    position="right"
+    fill={BASE_COLORS.orange}
     fontSize={12}
   />
 </ReferenceLine>
@@ -298,6 +325,7 @@ export default function DashboardV8() {
                       ))}
                     </Bar>
                     {/* Linha de referência fixa conforme a métrica selecionada */}
+{/* 🔹 Linha verde pontilhada — meta */}
 <ReferenceLine
   y={
     selectedMetric === "Índice de exercícios"
@@ -307,6 +335,7 @@ export default function DashboardV8() {
       : 75
   }
   stroke={BASE_COLORS.green}
+  strokeDasharray="4 4"
   strokeWidth={2}
 >
   <Label
@@ -318,7 +347,32 @@ export default function DashboardV8() {
         : "Meta: 75%"
     }
     position="right"
-    fill={BASE_COLORS.red}
+    fill={BASE_COLORS.green}
+    fontSize={12}
+  />
+</ReferenceLine>
+
+{/* 🔹 Linha amarela pontilhada — atenção */}
+<ReferenceLine
+  y={
+    selectedMetric === "Índice de exercícios"
+      ? 1
+      : selectedMetric === "Índice de acerto"
+      ? 50
+      : 50
+  }
+  stroke={BASE_COLORS.orange}
+  strokeDasharray="4 4"
+  strokeWidth={2}
+>
+  <Label
+    value={
+      selectedMetric === "Índice de exercícios"
+        ? "Atenção: 1"
+        : "Atenção: 50%"
+    }
+    position="right"
+    fill={BASE_COLORS.orange}
     fontSize={12}
   />
 </ReferenceLine>
