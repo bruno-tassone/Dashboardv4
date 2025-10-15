@@ -3,16 +3,15 @@ import Head from "next/head";
 import * as XLSX from "xlsx";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, ReferenceLine, Label, Cell
+  ReferenceLine, Label
 } from "recharts";
 
 const BASE_COLORS = {
   blue: "#2563eb",
   green: "#16a34a",
   yellow: "#facc15",
-  orange: "#f97316",
   red: "#ef4444",
-  gray: "#94a3b8"
+  gray: "#94a3b8",
 };
 
 function parseWorkbookToJSON(workbook) {
@@ -73,9 +72,9 @@ export default function DashboardV8() {
 
   const metricNames = ["Índice de exercícios", "Acessos no período", "Índice de acerto"];
   const lineKeys = {
-    "Índice de exercícios": "Exercicios",
-    "Acessos no período": "Acessos",
-    "Índice de acerto": "Acerto"
+    "Índice de exercícios": "Índice de exercícios",
+    "Acessos no período": "Acessos no período",
+    "Índice de acerto": "Índice de acerto",
   };
 
   useEffect(() => {
@@ -119,56 +118,40 @@ export default function DashboardV8() {
   const schools = useMemo(() => (dataBySchool ? Object.keys(dataBySchool).sort() : []), [dataBySchool]);
   const timeseries = useMemo(() => (selectedSchool && dataBySchool ? dataBySchool[selectedSchool] : []), [selectedSchool, dataBySchool]);
 
+  const metaY =
+    selectedMetric === "Índice de exercícios" ? 2 :
+    selectedMetric === "Índice de acerto" ? 70 : 75;
+  const atencaoY =
+    selectedMetric === "Índice de exercícios" ? 1 : 50;
+
+  const valorEhPercentual = selectedMetric === "Índice de acerto" || selectedMetric === "Acessos no período";
+
   const chartData = useMemo(() => {
-    const metaY =
-      selectedMetric === "Índice de exercícios"
-        ? 2
-        : selectedMetric === "Índice de acerto"
-        ? 70
-        : 75;
-    const atencaoY =
-      selectedMetric === "Índice de exercícios"
-        ? 1
-        : selectedMetric === "Índice de acerto"
-        ? 50
-        : 50;
-
     return timeseries.map((row) => {
-      const valor =
-        selectedMetric === "Índice de exercícios"
-          ? row["Índice de exercícios"] ?? 0
-          : selectedMetric === "Acessos no período"
-          ? row["Acessos no período"] ?? 0
-          : row["Índice de acerto"] ?? 0;
-
+      const valor = row[selectedMetric] ?? 0;
       let cor = BASE_COLORS.red;
       if (valor >= metaY) cor = BASE_COLORS.green;
       else if (valor >= atencaoY) cor = BASE_COLORS.yellow;
 
       return {
         Semana: row.Semana,
-        Exercicios: row["Índice de exercícios"] ?? 0,
-        Acessos: row["Acessos no período"] ?? 0,
-        Acerto: row["Índice de acerto"] ?? 0,
+        "Índice de exercícios": row["Índice de exercícios"] ?? 0,
+        "Acessos no período": row["Acessos no período"] ?? 0,
+        "Índice de acerto": row["Índice de acerto"] ?? 0,
         Color: cor,
       };
     });
   }, [timeseries, selectedMetric]);
 
-  const valorEhPercentual = selectedMetric === "Índice de acerto" || selectedMetric === "Acessos no período";
-
-  const metaY =
-    selectedMetric === "Índice de exercícios"
-      ? 2
-      : selectedMetric === "Índice de acerto"
-      ? 70
-      : 75;
-  const atencaoY =
-    selectedMetric === "Índice de exercícios"
-      ? 1
-      : selectedMetric === "Índice de acerto"
-      ? 50
-      : 50;
+  // 🔹 Geração do ranking
+  const ranking = useMemo(() => {
+    if (!dataBySchool) return [];
+    const lista = Object.entries(dataBySchool).map(([esc, arr]) => {
+      const media = arr.reduce((s, r) => s + (r[selectedMetric] ?? 0), 0) / arr.length;
+      return { escola: esc, media };
+    });
+    return lista.sort((a, b) => b.media - a.media);
+  }, [dataBySchool, selectedMetric]);
 
   return (
     <div className="container">
@@ -181,7 +164,7 @@ export default function DashboardV8() {
             <div>
               <div className="title">Dashboard Programação V8</div>
               <div style={{ color: "#475569", fontSize: 13 }}>
-                Linhas de referência fixas e cores dinâmicas nos pontos
+                Linhas de referência fixas, tabela e ranking dinâmico
               </div>
             </div>
           </div>
@@ -195,63 +178,117 @@ export default function DashboardV8() {
         </div>
 
         {timeseries.length > 0 && (
-          <div style={{ marginTop: 20 }}>
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <select className="select" value={selectedSchool || ""} onChange={(e) => setSelectedSchool(e.target.value)}>
-                <option value="">-- selecione a escola --</option>
-                {schools.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <select className="select" value={selectedMetric} onChange={(e) => setSelectedMetric(e.target.value)}>
-                {metricNames.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginTop: 16 }} className="card">
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                {selectedMetric} — Tendência
+          <>
+            <div style={{ marginTop: 20 }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <select className="select" value={selectedSchool || ""} onChange={(e) => setSelectedSchool(e.target.value)}>
+                  <option value="">-- selecione a escola --</option>
+                  {schools.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                <select className="select" value={selectedMetric} onChange={(e) => setSelectedMetric(e.target.value)}>
+                  {metricNames.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
               </div>
-              <div style={{ width: "100%", height: 400 }}>
-                <ResponsiveContainer>
-                  <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="Semana" />
-                    <YAxis
-                      domain={valorEhPercentual ? [0, 100] : ["auto", "auto"]}
-                      tickFormatter={valorEhPercentual ? (v) => `${v}%` : undefined}
-                    />
-                    <Tooltip formatter={(v) => (valorEhPercentual ? `${v.toFixed(1)}%` : v.toFixed(2))} />
-                    <Legend />
 
-                    {/* Linha de meta */}
-                    <ReferenceLine y={metaY} stroke={BASE_COLORS.green} strokeDasharray="5 5">
-                      <Label value="Meta" position="right" fill={BASE_COLORS.green} fontSize={12} />
-                    </ReferenceLine>
+              {/* 🔹 Gráfico principal */}
+              <div style={{ marginTop: 16 }} className="card">
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                  {selectedMetric} — Tendência
+                </div>
+                <div style={{ width: "100%", height: 400 }}>
+                  <ResponsiveContainer>
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="Semana" />
+                      <YAxis
+                        domain={valorEhPercentual ? [0, 100] : ["auto", "auto"]}
+                        tickFormatter={valorEhPercentual ? (v) => `${v}%` : undefined}
+                      />
+                      <Tooltip formatter={(v) => (valorEhPercentual ? `${v.toFixed(1)}%` : v.toFixed(2))} />
+                      <Legend />
+                      <ReferenceLine y={metaY} stroke={BASE_COLORS.green} strokeDasharray="5 5">
+                        <Label value="Meta" position="right" fill={BASE_COLORS.green} fontSize={12} />
+                      </ReferenceLine>
+                      <ReferenceLine y={atencaoY} stroke={BASE_COLORS.yellow} strokeDasharray="5 5">
+                        <Label value="Atenção" position="right" fill={BASE_COLORS.yellow} fontSize={12} />
+                      </ReferenceLine>
+                      <Line
+                        type="monotone"
+                        dataKey={lineKeys[selectedMetric]}
+                        stroke={BASE_COLORS.blue}
+                        strokeWidth={3}
+                        dot={({ cx, cy, payload }) => (
+                          <circle cx={cx} cy={cy} r={6} fill={payload.Color} stroke="#fff" strokeWidth={2} />
+                        )}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
 
-                    {/* Linha de atenção */}
-                    <ReferenceLine y={atencaoY} stroke={BASE_COLORS.yellow} strokeDasharray="5 5">
-                      <Label value="Atenção" position="right" fill={BASE_COLORS.yellow} fontSize={12} />
-                    </ReferenceLine>
+              {/* 🔹 Tabela de dados */}
+              <div className="card" style={{ marginTop: 24 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Tabela — Semana a Semana</div>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
+                      <th>Semana</th>
+                      <th>Índice de exercícios</th>
+                      <th>Acessos no período</th>
+                      <th>Índice de acerto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chartData.map((r, i) => (
+                      <tr key={i} style={{ background: i % 2 ? "#ffffff" : "#f9fafb" }}>
+                        <td>{r.Semana}</td>
+                        <td style={{ color: getColor(r["Índice de exercícios"], 2, 1) }}>{r["Índice de exercícios"].toFixed(2)}</td>
+                        <td style={{ color: getColor(r["Acessos no período"], 75, 50) }}>{r["Acessos no período"].toFixed(1)}%</td>
+                        <td style={{ color: getColor(r["Índice de acerto"], 70, 50) }}>{r["Índice de acerto"].toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-                    <Line
-                      type="monotone"
-                      dataKey={lineKeys[selectedMetric]}
-                      stroke={BASE_COLORS.blue}
-                      strokeWidth={3}
-                      dot={({ cx, cy, payload }) => (
-                        <circle cx={cx} cy={cy} r={6} fill={payload.Color} stroke="#fff" strokeWidth={2} />
-                      )}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              {/* 🔹 Ranking das escolas */}
+              <div className="card" style={{ marginTop: 24 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                  Ranking das escolas — {selectedMetric}
+                </div>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
+                      <th>Posição</th>
+                      <th>Escola</th>
+                      <th>Média</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ranking.map((r, i) => (
+                      <tr key={i}>
+                        <td>{i + 1}</td>
+                        <td>{r.escola}</td>
+                        <td>{valorEhPercentual ? `${r.media.toFixed(1)}%` : r.media.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
+
+  function getColor(valor, meta, atencao) {
+    if (valor >= meta) return BASE_COLORS.green;
+    if (valor >= atencao) return BASE_COLORS.yellow;
+    return BASE_COLORS.red;
+  }
 }
