@@ -1,101 +1,311 @@
-import { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import Head from "next/head";
 import * as XLSX from "xlsx";
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ReferenceLine,
-  ReferenceArea
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, ReferenceLine, Label, Cell
 } from "recharts";
 
-export default function Dashboard() {
-  const [data, setData] = useState([]);
-  const [uploadedFile, setUploadedFile] = useState(null);
+const BASE_COLORS = {
+  blue: "#2563eb",
+  green: "#10b981",
+  orange: "#f97316",
+  red: "#ef4444",
+  gray: "#94a3b8"
+};
 
-  // Função para processar Excel em JSON
-  const processExcel = (file) => {
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const workbook = XLSX.read(evt.target.result, { type: "binary" });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-      
-      // Filtra semanas 24 e 25
-      const filtered = sheet.filter(row => row.semana !== 24 && row.semana !== 25);
-      setData(filtered);
-    };
-    reader.readAsBinaryString(file);
+function parseWorkbookToJSON(workbook) {
+  const result = {};
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    result[sheetName] = json;
+  }
+  return result;
+}
+
+function normalizeSheets(parsed) {
+  const out = {};
+  for (const [sheetName, rows] of Object.entries(parsed)) {
+    if (!rows || rows.length < 2) continue;
+    const headers = rows[0].map(h => (h ? String(h).trim() : ""));
+    const weekCols = headers.slice(1).map(h => {
+      const m = String(h).match(/(\d+)/);
+      return m ? Number(m[1]) : null;
+    });
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      const escola = row[0];
+      if (!escola) continue;
+      for (let j = 1; j < row.length; j++) {
+        const sem = weekCols[j - 1];
+        if (sem == null) continue;
+        let val = row[j];
+
+        // Células em branco → 0
+        if (val === undefined || val === null || val === "" || isNaN(Number(val))) {
+          val = 0;
+        } else {
+          val = Number(val);
+        }
+
+        // Corrigir porcentagens (0.45 → 45)
+        if (["Índice de acerto", "Acessos no período"].includes(sheetName) && val <= 1) {
+          val = val * 100;
+        }
+
+        out[escola] = out[escola] || {};
+        out[escola][sem] = out[escola][sem] || { Escola: escola, Semana: sem };
+        out[escola][sem][sheetName] = val;
+      }
+    }
+  }
+
+  const final = {};
+  for (const [esc, obj] of Object.entries(out)) {
+    const arr = Object.values(obj).sort((a, b) => a.Semana - b.Semana);
+    final[esc] = arr;
+  }
+  return final;
+}
+
+export default function DashboardV8() {
+  const [rawSheets, setRawSheets] = useState(null);
+  const [dataBySchool, setDataBySchool] = useState(null);
+  const [selectedSchool, setSelectedSchool] = useState(null);
+  const [selectedMetric, setSelectedMetric] = useState("Índice de exercícios");
+  const [status, setStatus] = useState("Nenhum arquivo carregado");
+
+  const metricNames = ["Índice de exercícios", "Acessos no período", "Índice de acerto"];
+  const lineKeys = {
+    "Índice de exercícios": "Exercicios",
+    "Acessos no período": "Acessos",
+    "Índice de acerto": "Acerto"
   };
 
-  // Carrega arquivo padrão ao iniciar
   useEffect(() => {
-    fetch("/data_padrao.xlsx")
-      .then(res => res.arrayBuffer())
-      .then(buffer => {
-        const workbook = XLSX.read(buffer, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
-        const filtered = sheet.filter(row => row.semana !== 24 && row.semana !== 25);
-        setData(filtered);
-      });
+    try {
+      const saved = localStorage.getItem("lovable_v4_data");
+      if (saved) {
+        const obj = JSON.parse(saved);
+        setRawSheets(obj.rawSheets);
+        setStatus("Dados carregados do localStorage");
+      }
+    } catch (e) {}
   }, []);
 
-  // Upload do usuário
-  const handleUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploadedFile(file);
-    processExcel(file);
-  };
+  useEffect(() => {
+    if (!rawSheets) return;
+    const norm = normalizeSheets(rawSheets);
+    setDataBySchool(norm);
+    const schools = Object.keys(norm).sort();
+    if (schools.length) setSelectedSchool(schools[0]);
+  }, [rawSheets]);
 
-  // Define cor do ponto
-  const getColor = (y, ref) => {
-    if (y >= ref) return "green";
-    if (y >= 0.5 * ref) return "yellow";
-    return "red";
-  };
+  function handleFile(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const wb = XLSX.read(ev.target.result, { type: "binary" });
+        const parsed = parseWorkbookToJSON(wb);
+        setRawSheets(parsed);
+        localStorage.setItem("lovable_v4_data", JSON.stringify({ rawSheets: parsed }));
+        setStatus(`Arquivo carregado: ${f.name}`);
+      } catch (err) {
+        console.error(err);
+        setStatus("Erro ao ler arquivo");
+      }
+    };
+    reader.readAsBinaryString(f);
+  }
+
+  const schools = useMemo(() => (dataBySchool ? Object.keys(dataBySchool).sort() : []), [dataBySchool]);
+  const timeseries = useMemo(() => (selectedSchool && dataBySchool ? dataBySchool[selectedSchool] : []), [selectedSchool, dataBySchool]);
+
+  const chartData = useMemo(() => {
+    const arr = timeseries.map((row, i) => {
+      const prev = i > 0 ? timeseries[i - 1] : null;
+      const diff = prev ? row[selectedMetric] - prev[selectedMetric] : 0;
+      let cor = BASE_COLORS.gray;
+      if (diff > 0.01) cor = BASE_COLORS.green;
+      else if (diff < -0.01) cor = BASE_COLORS.red;
+      return {
+        Semana: row.Semana,
+        Exercicios: row["Índice de exercícios"] ?? 0,
+        Acessos: row["Acessos no período"] ?? 0,
+        Acerto: row["Índice de acerto"] ?? 0,
+        Color: cor
+      };
+    });
+    return arr;
+  }, [timeseries, selectedMetric]);
+
+  const mediaAcumulada = useMemo(() => {
+    if (!timeseries.length) return 0;
+    const vals = timeseries.map((r) => Number(r[selectedMetric] ?? 0));
+    const sum = vals.reduce((a, b) => a + b, 0);
+    return sum / vals.length;
+  }, [timeseries, selectedMetric]);
+
+  const valorEhPercentual = selectedMetric === "Índice de acerto" || selectedMetric === "Acessos no período";
+
+  // 🔹 Cálculo do indicador de tendência geral
+  const tendencia = useMemo(() => {
+    if (!timeseries.length) return { texto: "Sem dados", cor: BASE_COLORS.gray, emoji: "⚪" };
+    const ultimo = timeseries[timeseries.length - 1][selectedMetric];
+    const diff = ultimo - mediaAcumulada;
+    const diffPct = (diff / mediaAcumulada) * 100;
+    if (diffPct > 2)
+      return { texto: `Em alta (+${diffPct.toFixed(1)}%)`, cor: BASE_COLORS.green, emoji: "🔺" };
+    if (diffPct < -2)
+      return { texto: `Em queda (${diffPct.toFixed(1)}%)`, cor: BASE_COLORS.red, emoji: "🔻" };
+    return { texto: "Estável (na média)", cor: BASE_COLORS.gray, emoji: "⚪" };
+  }, [timeseries, mediaAcumulada, selectedMetric]);
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>Dashboard</h1>
-      
-      <input type="file" accept=".xlsx, .xls" onChange={handleUpload} />
-      
-      <p>Arquivo padrão: <b>data_padrao.xlsx</b></p>
-      {uploadedFile && <p>Arquivo enviado: <b>{uploadedFile.name}</b></p>}
+    <div className="container">
+      <Head><title>Dashboard Programação V8</title></Head>
 
-      <LineChart
-        width={800}
-        height={400}
-        data={data}
-        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="semana" label={{ value: "Semana", position: "insideBottom", offset: -5 }} />
-        <YAxis />
-        <Tooltip />
+      <div className="card">
+        <div className="header">
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="badge">V8</div>
+            <div>
+              <div className="title">Dashboard Programação V8</div>
+              <div style={{ color: "#475569", fontSize: 13 }}>
+                Cores dinâmicas, média acumulada e indicador de tendência
+              </div>
+            </div>
+          </div>
 
-        {/* Linha de referência */}
-        <ReferenceLine y={50} stroke="blue" strokeDasharray="3 3" label="Meta" />
+          <div className="controls">
+            <input className="file" type="file" accept=".xlsx,.xls" onChange={handleFile} />
+            <div style={{ padding: "6px 8px", borderRadius: 8, background: "#f1f5f9", border: "1px solid #e6edf3" }}>
+              {status}
+            </div>
+          </div>
+        </div>
 
-        {/* Observação férias */}
-        <ReferenceArea x1={24} x2={25} strokeOpacity={0.3} label="Férias escolares" />
+        {/* 🔹 Indicador de tendência geral */}
+        {timeseries.length > 0 && (
+          <div className="card" style={{ marginTop: 12, border: `2px solid ${tendencia.cor}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <span style={{ fontSize: 28 }}>{tendencia.emoji}</span>
+              <div>
+                <div style={{ fontWeight: 700, color: tendencia.cor }}>
+                  {tendencia.texto}
+                </div>
+                <div style={{ fontSize: 13, color: "#64748b" }}>
+                  Comparando a última semana com a média acumulada
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* Linha com pontos coloridos */}
-        <Line
-          type="monotone"
-          dataKey="valor"
-          stroke="#8884d8"
-          dot={data.map((entry) => ({
-            r: 5,
-            fill: getColor(entry.valor, 50) // 50 é valor da linha de referência
-          }))}
-        />
-      </LineChart>
+        <div className="grid">
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
+              <select className="select" value={selectedSchool || ""} onChange={(e) => setSelectedSchool(e.target.value)}>
+                <option value="">-- selecione a escola --</option>
+                {schools.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+
+              <select className="select" value={selectedMetric} onChange={(e) => setSelectedMetric(e.target.value)}>
+                {metricNames.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 🔹 Gráfico de Linhas */}
+            <div style={{ marginTop: 16 }} className="card">
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                {selectedMetric} — Tendência
+              </div>
+              <div style={{ width: "100%", height: 380 }}>
+                <ResponsiveContainer>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="Semana" />
+                    <YAxis
+                      domain={valorEhPercentual ? [0, 100] : ["auto", "auto"]}
+                      tickFormatter={valorEhPercentual ? (v) => `${v}%` : undefined}
+                    />
+                    <Tooltip formatter={(v) => (valorEhPercentual ? `${v.toFixed(1)}%` : v.toFixed(2))} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey={lineKeys[selectedMetric]}
+                      stroke={BASE_COLORS.blue}
+                      strokeWidth={3}
+                      dot={({ cx, cy, payload }) => (
+                        <circle cx={cx} cy={cy} r={5} fill={payload.Color} stroke="#fff" strokeWidth={2} />
+                      )}
+                    />
+                    <ReferenceLine
+                      y={mediaAcumulada}
+                      stroke={BASE_COLORS.red}
+                      strokeDasharray="3 3"
+                    >
+                      <Label value="Média acumulada" position="right" fill={BASE_COLORS.red} fontSize={12} />
+                    </ReferenceLine>
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* 🔹 Gráfico de Colunas */}
+            <div className="card" style={{ marginTop: 16 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                {selectedMetric} — Comparativo semanal
+              </div>
+              <div style={{ width: "100%", height: 280 }}>
+                <ResponsiveContainer>
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="Semana" />
+                    <YAxis
+                      domain={valorEhPercentual ? [0, 100] : ["auto", "auto"]}
+                      tickFormatter={valorEhPercentual ? (v) => `${v}%` : undefined}
+                    />
+                    <Tooltip formatter={(v) => (valorEhPercentual ? `${v.toFixed(1)}%` : v.toFixed(2))} />
+                    <Bar dataKey={lineKeys[selectedMetric]}>
+                      {chartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.Color} />
+                      ))}
+                    </Bar>
+                    <ReferenceLine
+                      y={mediaAcumulada}
+                      stroke={BASE_COLORS.red}
+                      strokeDasharray="3 3"
+                    >
+                      <Label value="Média acumulada" position="right" fill={BASE_COLORS.red} fontSize={12} />
+                    </ReferenceLine>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* 🔹 Valor numérico da média */}
+            <div className="card" style={{ marginTop: 16 }}>
+              <div style={{ fontWeight: 700 }}>Média acumulada</div>
+              <div style={{ fontSize: 22, fontWeight: 600, color: BASE_COLORS.blue, marginTop: 4 }}>
+                {valorEhPercentual ? `${mediaAcumulada.toFixed(1)}%` : mediaAcumulada.toFixed(2)}
+              </div>
+              <div style={{ fontSize: 13, color: "#64748b" }}>
+                Média das semanas para a métrica selecionada
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
+
 
