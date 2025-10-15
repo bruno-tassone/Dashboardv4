@@ -295,36 +295,68 @@ export default function DashboardV8() {
   </div>
 </div>
 
-              {/* 🔹 Ranking das escolas */}
-              <div className="card" style={{ marginTop: 24 }}>
-                <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                  Ranking das escolas — {selectedMetric}
-                </div>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
-                      <th>Posição</th>
-                      <th>Escola</th>
-                      <th>Média</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ranking.map((r, i) => (
-                      <tr key={i}>
-                        <td>{i + 1}</td>
-                        <td>{r.escola}</td>
-                        <td>{valorEhPercentual ? `${r.media.toFixed(1)}%` : r.media.toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+              {/* 🔹 Ranking das Escolas */}
+{dataBySchool && (
+  <div className="card" style={{ marginTop: 24 }}>
+    <div style={{ fontWeight: 700, marginBottom: 8 }}>
+      Ranking de Escolas — {selectedMetric}
     </div>
-  );
+
+    {(() => {
+      // Monta média por escola para o indicador atual
+      const ranking = Object.entries(dataBySchool)
+        .map(([esc, dados]) => {
+          const valores = dados.map((r) => Number(r[selectedMetric] ?? 0));
+          const media = valores.length ? valores.reduce((a, b) => a + b, 0) / valores.length : 0;
+          return { escola: esc, media };
+        })
+        .sort((a, b) => b.media - a.media);
+
+      const ehPercentual =
+        selectedMetric === "Acessos no período" || selectedMetric === "Índice de acerto";
+
+      return (
+        <table style={{ borderCollapse: "collapse", width: "100%" }}>
+          <thead>
+            <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
+              <th style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>Posição</th>
+              <th style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>Escola</th>
+              <th style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>Média</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ranking.map((item, i) => {
+              const destaque = item.escola === selectedSchool;
+              return (
+                <tr
+                  key={item.escola}
+                  style={{
+                    background: destaque ? "#dbeafe" : i % 2 === 0 ? "#ffffff" : "#f8fafc",
+                    fontWeight: destaque ? "700" : "normal",
+                    color: destaque ? "#1e3a8a" : "#0f172a",
+                  }}
+                >
+                  <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>
+                    {i + 1}
+                  </td>
+                  <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>
+                    {destaque ? "🔹 " : ""}
+                    {item.escola}
+                  </td>
+                  <td style={{ padding: "8px 12px", border: "1px solid #e2e8f0" }}>
+                    {ehPercentual
+                      ? `${item.media.toFixed(1)}%`
+                      : item.media.toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      );
+    })()}
+  </div>
+)}
 
   function getColor(valor, meta, atencao) {
     if (valor >= meta) return BASE_COLORS.green;
